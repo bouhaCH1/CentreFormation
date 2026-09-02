@@ -1,0 +1,14 @@
+# Build output directories
+build/
+*.user
+*.user.*
+CMakeLists.txt.user
+
+# Binaries
+*.exe
+*.obj
+*.o
+*.a
+
+# Temporary reports
+*.pdf
