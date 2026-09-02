@@ -2,6 +2,7 @@
 #include "../models/Cours.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QGridLayout>
 #include <QLabel>
 #include <QDate>
 #include <QtCharts/QBarSeries>
@@ -19,12 +20,15 @@ StatsCoursWidget::StatsCoursWidget(QWidget *parent)
 
 void StatsCoursWidget::setupUI() {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(12, 12, 12, 12);
+    mainLayout->setSpacing(12);
 
     QLabel *titleLabel = new QLabel("📊 Statistiques - Module Cours", this);
-    titleLabel->setStyleSheet("font-size: 20px; font-weight: bold; color: #1E3A8A; margin-bottom: 10px;");
+    titleLabel->setStyleSheet("font-size: 20px; font-weight: bold; color: #1E3A8A; margin-bottom: 5px;");
     mainLayout->addWidget(titleLabel);
 
-    QHBoxLayout *chartsLayout = new QHBoxLayout();
+    QGridLayout *gridLayout = new QGridLayout();
+    gridLayout->setSpacing(12);
 
     m_chartViewCat = new QChartView(this);
     m_chartViewCat->setRenderHint(QPainter::Antialiasing);
@@ -35,11 +39,14 @@ void StatsCoursWidget::setupUI() {
     m_chartViewMois = new QChartView(this);
     m_chartViewMois->setRenderHint(QPainter::Antialiasing);
 
-    chartsLayout->addWidget(m_chartViewCat);
-    chartsLayout->addWidget(m_chartViewNiveau);
-    chartsLayout->addWidget(m_chartViewMois);
+    // Row 0: Category bar chart & Level pie chart side-by-side
+    gridLayout->addWidget(m_chartViewCat, 0, 0);
+    gridLayout->addWidget(m_chartViewNiveau, 0, 1);
 
-    mainLayout->addLayout(chartsLayout);
+    // Row 1: Monthly timeline spanning full width (gives 12 months ample horizontal space)
+    gridLayout->addWidget(m_chartViewMois, 1, 0, 1, 2);
+
+    mainLayout->addLayout(gridLayout);
 }
 
 QChart* StatsCoursWidget::createCategorieChart() {
@@ -63,7 +70,7 @@ QChart* StatsCoursWidget::createCategorieChart() {
 
     QBarCategoryAxis *axisX = new QBarCategoryAxis();
     axisX->append(categories);
-    axisX->setLabelsFont(QFont("Segoe UI", 8, QFont::Bold));
+    axisX->setLabelsFont(QFont("Segoe UI", 9, QFont::Bold));
     chart->addAxis(axisX, Qt::AlignBottom);
     series->attachAxis(axisX);
 
@@ -106,7 +113,7 @@ QChart* StatsCoursWidget::createMoisChart() {
     QBarSet *set = new QBarSet("Cours prévus");
     set->setColor(QColor("#6366F1"));
 
-    QStringList mois = {"Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"};
+    QStringList mois = {"Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"};
     QMap<int, int> stats = Cours::statsParMois(QDate::currentDate().year());
 
     for (int m = 1; m <= 12; ++m) {
@@ -119,8 +126,7 @@ QChart* StatsCoursWidget::createMoisChart() {
 
     QBarCategoryAxis *axisX = new QBarCategoryAxis();
     axisX->append(mois);
-    axisX->setLabelsAngle(-45);
-    axisX->setLabelsFont(QFont("Segoe UI", 8, QFont::Bold));
+    axisX->setLabelsFont(QFont("Segoe UI", 9, QFont::Bold));
     chart->addAxis(axisX, Qt::AlignBottom);
     series->attachAxis(axisX);
 
