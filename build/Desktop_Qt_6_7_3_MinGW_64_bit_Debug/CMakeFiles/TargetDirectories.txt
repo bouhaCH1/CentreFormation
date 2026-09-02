@@ -1,0 +1,5 @@
+C:/Users/enabo/Desktop/CentreFormation/build/Desktop_Qt_6_7_3_MinGW_64_bit_Debug/CMakeFiles/CentreFormation.dir
+C:/Users/enabo/Desktop/CentreFormation/build/Desktop_Qt_6_7_3_MinGW_64_bit_Debug/CMakeFiles/edit_cache.dir
+C:/Users/enabo/Desktop/CentreFormation/build/Desktop_Qt_6_7_3_MinGW_64_bit_Debug/CMakeFiles/rebuild_cache.dir
+C:/Users/enabo/Desktop/CentreFormation/build/Desktop_Qt_6_7_3_MinGW_64_bit_Debug/CMakeFiles/CentreFormation_autogen_timestamp_deps.dir
+C:/Users/enabo/Desktop/CentreFormation/build/Desktop_Qt_6_7_3_MinGW_64_bit_Debug/CMakeFiles/CentreFormation_autogen.dir
