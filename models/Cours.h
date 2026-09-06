@@ -59,6 +59,9 @@ public:
     static int totalHeures();
     static QString nomSallePourId(int idSalle);
 
+    // Advanced AI Métier
+    static QString analyseIAPlanning();
+
 private:
     int m_id;
     QString m_nom;

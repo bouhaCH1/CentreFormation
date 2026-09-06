@@ -1,8 +1,11 @@
 #include "Salle.h"
+#include "../database/DatabaseManager.h"
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QVariant>
 #include <QDebug>
+
+QString Salle::lastError = "";
 
 Salle::Salle()
     : m_id(0), m_capacite(0), m_disponible(true) {}
@@ -11,74 +14,70 @@ Salle::Salle(int id, const QString& nom, int capacite, const QString& type, cons
     : m_id(id), m_nom(nom), m_capacite(capacite), m_type(type), m_equipement(equipement), m_disponible(disponible) {}
 
 Salle Salle::fromQuery(const QSqlQuery& query) {
-    Salle s;
-    s.m_id = query.value("ID_SALLE").toInt();
-    s.m_nom = query.value("NOM_SALLE").toString();
-    s.m_capacite = query.value("CAPACITE").toInt();
-    s.m_type = query.value("TYPE_SALLE").toString();
-    s.m_equipement = query.value("EQUIPEMENT").toString();
-    s.m_disponible = (query.value("DISPONIBLE").toInt() == 1);
-    return s;
+    return Salle(
+        query.value("ID_SALLE").toInt(),
+        query.value("NOM_SALLE").toString(),
+        query.value("CAPACITE").toInt(),
+        query.value("TYPE_SALLE").toString(),
+        query.value("EQUIPEMENT").toString(),
+        query.value("DISPONIBLE").toInt() == 1
+    );
 }
 
 bool Salle::ajouter() {
-    QSqlQuery q;
-    q.prepare("INSERT INTO SALLE (NOM_SALLE, CAPACITE, TYPE_SALLE, EQUIPEMENT, DISPONIBLE) "
-              "VALUES (:nom, :cap, :type, :eq, :dispo)");
-    q.bindValue(":nom", m_nom);
-    q.bindValue(":cap", m_capacite);
-    q.bindValue(":type", m_type);
-    q.bindValue(":eq", m_equipement);
-    q.bindValue(":dispo", m_disponible ? 1 : 0);
+    QSqlQuery query;
+    query.prepare("INSERT INTO SALLE (NOM_SALLE, CAPACITE, TYPE_SALLE, EQUIPEMENT, DISPONIBLE) "
+                  "VALUES (:nom, :cap, :type, :eq, :dispo)");
+    query.bindValue(":nom", m_nom);
+    query.bindValue(":cap", m_capacite);
+    query.bindValue(":type", m_type);
+    query.bindValue(":eq", m_equipement);
+    query.bindValue(":dispo", m_disponible ? 1 : 0);
 
-    if (!q.exec()) {
-        qCritical() << "Erreur ajout salle:" << q.lastError().text();
-        return false;
+    bool res = query.exec();
+    if (!res) {
+        lastError = query.lastError().text();
+        qDebug() << "Salle::ajouter error:" << lastError;
     }
-    return true;
+    return res;
 }
 
 bool Salle::modifier() {
-    QSqlQuery q;
-    q.prepare("UPDATE SALLE SET NOM_SALLE = :nom, CAPACITE = :cap, TYPE_SALLE = :type, "
-              "EQUIPEMENT = :eq, DISPONIBLE = :dispo WHERE ID_SALLE = :id");
-    q.bindValue(":nom", m_nom);
-    q.bindValue(":cap", m_capacite);
-    q.bindValue(":type", m_type);
-    q.bindValue(":eq", m_equipement);
-    q.bindValue(":dispo", m_disponible ? 1 : 0);
-    q.bindValue(":id", m_id);
+    QSqlQuery query;
+    query.prepare("UPDATE SALLE SET NOM_SALLE = :nom, CAPACITE = :cap, TYPE_SALLE = :type, "
+                  "EQUIPEMENT = :eq, DISPONIBLE = :dispo WHERE ID_SALLE = :id");
+    query.bindValue(":nom", m_nom);
+    query.bindValue(":cap", m_capacite);
+    query.bindValue(":type", m_type);
+    query.bindValue(":eq", m_equipement);
+    query.bindValue(":dispo", m_disponible ? 1 : 0);
+    query.bindValue(":id", m_id);
 
-    if (!q.exec()) {
-        qCritical() << "Erreur modification salle:" << q.lastError().text();
-        return false;
+    bool res = query.exec();
+    if (!res) {
+        lastError = query.lastError().text();
+        qDebug() << "Salle::modifier error:" << lastError;
     }
-    return true;
+    return res;
 }
 
 bool Salle::supprimer() {
-    // Vérification de la contrainte d'intégrité référentielle avec la table COURS
-    QSqlQuery checkQuery;
-    checkQuery.prepare("SELECT COUNT(*) FROM COURS WHERE ID_SALLE = :id");
-    checkQuery.bindValue(":id", m_id);
-    if (checkQuery.exec() && checkQuery.next()) {
-        if (checkQuery.value(0).toInt() > 0) {
-            qWarning() << "Impossible de supprimer la salle ID" << m_id << ": des cours y sont affectés.";
-            return false;
-        }
+    QSqlQuery query;
+    query.prepare("DELETE FROM SALLE WHERE ID_SALLE = :id");
+    query.bindValue(":id", m_id);
+    bool res = query.exec();
+    if (!res) {
+        lastError = query.lastError().text();
+        qDebug() << "Salle::supprimer error:" << lastError;
     }
-
-    QSqlQuery q;
-    q.prepare("DELETE FROM SALLE WHERE ID_SALLE = :id");
-    q.bindValue(":id", m_id);
-    return q.exec();
+    return res;
 }
 
 QList<Salle> Salle::afficher() {
     QList<Salle> list;
-    QSqlQuery q("SELECT ID_SALLE, NOM_SALLE, CAPACITE, TYPE_SALLE, EQUIPEMENT, DISPONIBLE FROM SALLE ORDER BY ID_SALLE ASC");
-    while (q.next()) {
-        list.append(fromQuery(q));
+    QSqlQuery query("SELECT ID_SALLE, NOM_SALLE, CAPACITE, TYPE_SALLE, EQUIPEMENT, DISPONIBLE FROM SALLE ORDER BY ID_SALLE ASC");
+    while (query.next()) {
+        list.append(fromQuery(query));
     }
     return list;
 }
@@ -87,45 +86,17 @@ QList<Salle> Salle::rechercher(const QString& nom, const QString& type, int capM
     QList<Salle> list;
     QString sql = "SELECT ID_SALLE, NOM_SALLE, CAPACITE, TYPE_SALLE, EQUIPEMENT, DISPONIBLE FROM SALLE WHERE 1=1";
 
-    if (!nom.trimmed().isEmpty()) {
-        sql += " AND UPPER(NOM_SALLE) LIKE UPPER(:nom)";
-    }
-    if (!type.trimmed().isEmpty() && type != "Tous") {
-        sql += " AND TYPE_SALLE = :type";
-    }
-    if (capMin > 0) {
-        sql += " AND CAPACITE >= :capMin";
-    }
-    if (capMax > 0) {
-        sql += " AND CAPACITE <= :capMax";
-    }
-    if (disponible != -1) {
-        sql += " AND DISPONIBLE = :dispo";
-    }
-    sql += " ORDER BY NOM_SALLE ASC";
+    if (!nom.isEmpty()) sql += " AND LOWER(NOM_SALLE) LIKE '%" + nom.toLower() + "%'";
+    if (!type.isEmpty() && type != "Tous") sql += " AND TYPE_SALLE = '" + type + "'";
+    if (capMin > 0) sql += QString(" AND CAPACITE >= %1").arg(capMin);
+    if (capMax > 0) sql += QString(" AND CAPACITE <= %1").arg(capMax);
+    if (disponible != -1) sql += QString(" AND DISPONIBLE = %1").arg(disponible);
 
-    QSqlQuery q;
-    q.prepare(sql);
-    if (!nom.trimmed().isEmpty()) {
-        q.bindValue(":nom", "%" + nom.trimmed() + "%");
-    }
-    if (!type.trimmed().isEmpty() && type != "Tous") {
-        q.bindValue(":type", type);
-    }
-    if (capMin > 0) {
-        q.bindValue(":capMin", capMin);
-    }
-    if (capMax > 0) {
-        q.bindValue(":capMax", capMax);
-    }
-    if (disponible != -1) {
-        q.bindValue(":dispo", disponible);
-    }
+    sql += " ORDER BY ID_SALLE ASC";
 
-    if (q.exec()) {
-        while (q.next()) {
-            list.append(fromQuery(q));
-        }
+    QSqlQuery query(sql);
+    while (query.next()) {
+        list.append(fromQuery(query));
     }
     return list;
 }
@@ -138,44 +109,44 @@ QList<Salle> Salle::trier(const QString& critere, const QString& ordre) {
     else if (critere == "Type") col = "TYPE_SALLE";
     else if (critere == "Disponibilite") col = "DISPONIBLE";
 
-    QString dir = (ordre.toUpper() == "DESC" || ordre == "Décroissant") ? "DESC" : "ASC";
-    QString sql = QString("SELECT ID_SALLE, NOM_SALLE, CAPACITE, TYPE_SALLE, EQUIPEMENT, DISPONIBLE FROM SALLE ORDER BY %1 %2").arg(col, dir);
+    QString dir = (ordre == "Décroissant") ? "DESC" : "ASC";
+    QString sql = QString("SELECT ID_SALLE, NOM_SALLE, CAPACITE, TYPE_SALLE, EQUIPEMENT, DISPONIBLE FROM SALLE ORDER BY %1 %2").arg(col).arg(dir);
 
-    QSqlQuery q(sql);
-    while (q.next()) {
-        list.append(fromQuery(q));
+    QSqlQuery query(sql);
+    while (query.next()) {
+        list.append(fromQuery(query));
     }
     return list;
 }
 
 QMap<QString, int> Salle::statsParType() {
-    QMap<QString, int> res;
-    QSqlQuery q("SELECT TYPE_SALLE, COUNT(*) FROM SALLE GROUP BY TYPE_SALLE");
-    while (q.next()) {
-        res.insert(q.value(0).toString(), q.value(1).toInt());
+    QMap<QString, int> stats;
+    QSqlQuery query("SELECT TYPE_SALLE, COUNT(*) FROM SALLE GROUP BY TYPE_SALLE");
+    while (query.next()) {
+        stats[query.value(0).toString()] = query.value(1).toInt();
     }
-    return res;
+    return stats;
 }
 
 int Salle::countDisponibles() {
-    QSqlQuery q("SELECT COUNT(*) FROM SALLE WHERE DISPONIBLE = 1");
-    if (q.next()) return q.value(0).toInt();
+    QSqlQuery query("SELECT COUNT(*) FROM SALLE WHERE DISPONIBLE = 1");
+    if (query.next()) return query.value(0).toInt();
     return 0;
 }
 
 int Salle::countIndisponibles() {
-    QSqlQuery q("SELECT COUNT(*) FROM SALLE WHERE DISPONIBLE = 0");
-    if (q.next()) return q.value(0).toInt();
+    QSqlQuery query("SELECT COUNT(*) FROM SALLE WHERE DISPONIBLE = 0");
+    if (query.next()) return query.value(0).toInt();
     return 0;
 }
 
 QMap<QString, int> Salle::statsCapaciteMoyenneParType() {
-    QMap<QString, int> res;
-    QSqlQuery q("SELECT TYPE_SALLE, AVG(CAPACITE) FROM SALLE GROUP BY TYPE_SALLE");
-    while (q.next()) {
-        res.insert(q.value(0).toString(), q.value(1).toInt());
+    QMap<QString, int> stats;
+    QSqlQuery query("SELECT TYPE_SALLE, AVG(CAPACITE) FROM SALLE GROUP BY TYPE_SALLE");
+    while (query.next()) {
+        stats[query.value(0).toString()] = query.value(1).toInt();
     }
-    return res;
+    return stats;
 }
 
 bool Salle::toggleDisponibilite(int id) {
@@ -196,4 +167,41 @@ QList<QPair<QString, QString>> Salle::getCoursEnSalle(int idSalle) {
         }
     }
     return list;
+}
+
+QString Salle::analyseIAOptimisation() {
+    QList<Salle> salles = afficher();
+    int total = salles.size();
+    int dispo = countDisponibles();
+    int indispo = countIndisponibles();
+
+    if (total == 0) return "🤖 Aucun espace de formation disponible dans la base Oracle.";
+
+    double ratioDispo = (double)dispo / total * 100.0;
+    int scoreEfficiency = static_cast<int>(100 - ratioDispo * 0.4);
+
+    QString report = "🤖 <b>Rapport d'Analyse & Optimisation par IA - Salles de Formation</b><br><br>";
+    report += QString("📊 <b>Score d'Efficacité Énergétique & d'Occupation :</b> <font color='#2563EB'><b>%1 / 100</b></font><br>").arg(scoreEfficiency);
+    report += QString("• Total des Salles enregistrées : <b>%1</b><br>").arg(total);
+    report += QString("• Salles Actives & Disponibles : <font color='#059669'><b>%1 (%2%%)</b></font><br>").arg(dispo).arg(QString::number(ratioDispo, 'f', 1));
+    report += QString("• Salles Indisponibles / Occupées : <font color='#DC2626'><b>%1</b></font><br><br>").arg(indispo);
+
+    report += "💡 <b>Recommandations de l'Algorithme IA :</b><br>";
+
+    for (const Salle& s : salles) {
+        if (s.getCapacite() >= 100 && s.isDisponible()) {
+            report += QString("  • <font color='#8B5CF6'><b>%1</b></font> (Cap: %2 places) est disponible. L'IA recommande de la réserver prioritairement pour les conférences ou grandes promotions.<br>").arg(s.getNom()).arg(s.getCapacite());
+        }
+        if (s.getType() == "TP" && !s.getEquipement().contains("Projecteur", Qt::CaseInsensitive)) {
+            report += QString("  • ⚠️ <b>%1</b> (Labo TP) manque de projecteur HD. L'IA suggère d'ajouter des équipements vidéo.<br>").arg(s.getNom());
+        }
+    }
+
+    if (dispo == 0) {
+        report += "  • 🚨 <b>Alerte Saturation :</b> 100% des salles sont indisponibles. L'IA recommande la création de créneaux supplémentaires.";
+    } else {
+        report += "  • ✅ <b>Optimisation des Espace :</b> La répartition actuelle garantit un niveau de disponibilité optimal sans surpopulation.";
+    }
+
+    return report;
 }

@@ -1,6 +1,7 @@
 #include "CoursWidget.h"
 #include "StatsCoursWidget.h"
 #include "../models/Salle.h"
+#include "../models/QRCodeGenerator.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -73,6 +74,12 @@ void CoursWidget::setupUI() {
     m_btnStats = new QPushButton("📊 Statistiques", this);
     m_btnStats->setStyleSheet("background-color: #6366F1; color: white;");
 
+    m_btnIA = new QPushButton("🤖 Assistant IA Planning", this);
+    m_btnIA->setStyleSheet("background-color: #4F46E5; color: white;");
+
+    m_btnQRCode = new QPushButton("📱 QR Code", this);
+    m_btnQRCode->setStyleSheet("background-color: #0284C7; color: white;");
+
     toolbarLayout->addWidget(m_btnAjouter);
     toolbarLayout->addWidget(m_btnModifier);
     toolbarLayout->addWidget(m_btnSupprimer);
@@ -81,6 +88,8 @@ void CoursWidget::setupUI() {
     toolbarLayout->addWidget(btnSearchToggle);
     toolbarLayout->addWidget(m_btnPDF);
     toolbarLayout->addWidget(m_btnStats);
+    toolbarLayout->addWidget(m_btnIA);
+    toolbarLayout->addWidget(m_btnQRCode);
     toolbarLayout->addStretch();
 
     layoutListe->addLayout(toolbarLayout);
@@ -281,6 +290,8 @@ void CoursWidget::setupUI() {
     connect(btnAppliquerSort, &QPushButton::clicked, this, &CoursWidget::onApplySort);
     connect(m_btnPDF, &QPushButton::clicked, this, &CoursWidget::onGeneratePDF);
     connect(m_btnStats, &QPushButton::clicked, this, &CoursWidget::onShowStats);
+    connect(m_btnIA, &QPushButton::clicked, this, &CoursWidget::onIAAssistant);
+    connect(m_btnQRCode, &QPushButton::clicked, this, &CoursWidget::onQRCode);
 
     connect(btnSave, &QPushButton::clicked, this, &CoursWidget::onSave);
     connect(btnCancel, &QPushButton::clicked, this, &CoursWidget::onCancel);
@@ -542,6 +553,93 @@ void CoursWidget::onCalculChargeHoraire() {
     msg += QString("\n⏱️ TOTAL GLOBAL : %1 heures de formation").arg(total);
 
     QMessageBox::information(this, "Calcul de Charge Horaire", msg);
+}
+
+void CoursWidget::onIAAssistant() {
+    QString report = Cours::analyseIAPlanning();
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("🤖 Assistant IA - Planification des Cours");
+    msgBox.setText(report);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.exec();
+}
+
+void CoursWidget::onQRCode() {
+    int row = m_tableWidget->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Sélection requise", "Veuillez d'abord cliquer sur un cours dans le tableau pour générer son QR Code.");
+        return;
+    }
+
+    QString idStr = m_tableWidget->item(row, 0)->text();
+    QString nomStr = m_tableWidget->item(row, 1)->text();
+    QString dureeStr = m_tableWidget->item(row, 2)->text();
+    QString niveauStr = m_tableWidget->item(row, 3)->text();
+    QString catStr = m_tableWidget->item(row, 4)->text();
+    QString dateDebStr = m_tableWidget->item(row, 5)->text();
+    QString dateFinStr = m_tableWidget->item(row, 6)->text();
+    QString salleStr = m_tableWidget->item(row, 8)->text();
+
+    QString qrPayload = QString(
+        "CENTRE DE FORMATION ESPRIT\n"
+        "--- FICHE DU COURS ---\n"
+        "ID: #%1\n"
+        "Nom: %2\n"
+        "Durée: %3h\n"
+        "Niveau: %4\n"
+        "Catégorie: %5\n"
+        "Période: %6 -> %7\n"
+        "Salle: %8\n"
+        "Oracle XE verified"
+    ).arg(idStr).arg(nomStr).arg(dureeStr).arg(niveauStr).arg(catStr).arg(dateDebStr).arg(dateFinStr).arg(salleStr);
+
+    QPixmap pixmap = QRCodeGenerator::generateQRCodePixmap(qrPayload, 260);
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("📱 Flashcode / QR Code — %1").arg(nomStr));
+    dlg.resize(400, 490);
+
+    QVBoxLayout *layout = new QVBoxLayout(&dlg);
+    layout->setContentsMargins(20, 20, 20, 20);
+    layout->setSpacing(12);
+
+    QLabel *lblTitle = new QLabel(QString("📱 QR Code Officiel - %1").arg(nomStr), &dlg);
+    lblTitle->setStyleSheet("font-size: 16px; font-weight: bold; color: #1E3A8A;");
+    lblTitle->setAlignment(Qt::AlignCenter);
+    layout->addWidget(lblTitle);
+
+    QLabel *lblImg = new QLabel(&dlg);
+    lblImg->setPixmap(pixmap);
+    lblImg->setAlignment(Qt::AlignCenter);
+    layout->addWidget(lblImg);
+
+    QLabel *lblInfo = new QLabel(QString("Scannez ce QR Code pour accéder au programme et fiche d'information du cours #%1 (%2).").arg(idStr).arg(nomStr), &dlg);
+    lblInfo->setWordWrap(true);
+    lblInfo->setAlignment(Qt::AlignCenter);
+    lblInfo->setStyleSheet("color: #64748B; font-size: 12px;");
+    layout->addWidget(lblInfo);
+
+    QHBoxLayout *btnLayout = new QHBoxLayout();
+    QPushButton *btnSave = new QPushButton("💾 Enregistrer Image (.png)", &dlg);
+    btnSave->setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; padding: 8px 16px; border-radius: 6px;");
+
+    QPushButton *btnClose = new QPushButton("Fermer", &dlg);
+    btnClose->setStyleSheet("background-color: #64748B; color: white; font-weight: bold; padding: 8px 16px; border-radius: 6px;");
+
+    btnLayout->addWidget(btnSave);
+    btnLayout->addWidget(btnClose);
+    layout->addLayout(btnLayout);
+
+    connect(btnClose, &QPushButton::clicked, &dlg, &QDialog::accept);
+    connect(btnSave, &QPushButton::clicked, [this, pixmap, nomStr]() {
+        QString fileName = QFileDialog::getSaveFileName(this, "Enregistrer QR Code", QString("QRCode_Cours_%1.png").arg(nomStr), "Images PNG (*.png)");
+        if (!fileName.isEmpty()) {
+            pixmap.save(fileName, "PNG");
+            QMessageBox::information(this, "Succès", QString("QR Code enregistré avec succès dans :\n%1").arg(fileName));
+        }
+    });
+
+    dlg.exec();
 }
 
 void CoursWidget::onGeneratePDF() {

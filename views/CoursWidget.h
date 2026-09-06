@@ -36,6 +36,8 @@ private slots:
     void onGeneratePDF();
     void onDetectConflits();
     void onCalculChargeHoraire();
+    void onIAAssistant();
+    void onQRCode();
     void onTableSelectionChanged();
 
 private:
@@ -68,6 +70,8 @@ private:
     QPushButton *m_btnCharge;
     QPushButton *m_btnPDF;
     QPushButton *m_btnStats;
+    QPushButton *m_btnIA;
+    QPushButton *m_btnQRCode;
 
     // Page 1: Formulaire
     QLabel *m_formTitleLabel;

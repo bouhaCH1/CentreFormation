@@ -20,6 +20,10 @@ set(PROJECT_SOURCES
     models/Salle.cpp
     models/Cours.h
     models/Cours.cpp
+    models/QRCodeGenerator.h
+    models/QRCodeGenerator.cpp
+    views/LoginWidget.h
+    views/LoginWidget.cpp
     views/MainWindow.h
     views/MainWindow.cpp
     views/SalleWidget.h

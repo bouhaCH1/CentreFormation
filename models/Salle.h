@@ -44,6 +44,11 @@ public:
     static bool toggleDisponibilite(int id);
     static QList<QPair<QString, QString>> getCoursEnSalle(int idSalle);
 
+    // Advanced AI Métier
+    static QString analyseIAOptimisation();
+
+    static QString lastError;
+
 private:
     int m_id;
     QString m_nom;

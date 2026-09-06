@@ -1,10 +1,10 @@
 #include "Cours.h"
+#include "../database/DatabaseManager.h"
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QSqlError>
 #include <QVariant>
 #include <QDebug>
-
 
 Cours::Cours()
     : m_id(0), m_duree(0), m_idSalle(0) {}
@@ -17,150 +17,110 @@ Cours::Cours(int id, const QString& nom, const QString& description, int duree,
       m_dateDebut(dateDebut), m_dateFin(dateFin), m_idSalle(idSalle) {}
 
 Cours Cours::fromQuery(const QSqlQuery& query) {
-    Cours c;
-    c.m_id = query.value("ID_COURS").toInt();
-    c.m_nom = query.value("NOM_COURS").toString();
-    c.m_description = query.value("DESCRIPTION").toString();
-    c.m_duree = query.value("DUREE").toInt();
-    c.m_niveau = query.value("NIVEAU").toString();
-    c.m_categorie = query.value("CATEGORIE").toString();
-    c.m_dateDebut = query.value("DATE_DEBUT").toDate();
-    c.m_dateFin = query.value("DATE_FIN").toDate();
-    c.m_idSalle = query.value("ID_SALLE").toInt();
-    if (query.record().indexOf("NOM_SALLE") != -1) {
-        c.m_nomSalle = query.value("NOM_SALLE").toString();
+    Cours c(
+        query.value("ID_COURS").toInt(),
+        query.value("NOM_COURS").toString(),
+        query.value("DESCRIPTION").toString(),
+        query.value("DUREE").toInt(),
+        query.value("NIVEAU").toString(),
+        query.value("CATEGORIE").toString(),
+        query.value("DATE_DEBUT").toDate(),
+        query.value("DATE_FIN").toDate(),
+        query.value("ID_SALLE").toInt()
+    );
+    if (query.record().indexOf("NOM_SALLE") >= 0) {
+        c.setNomSalle(query.value("NOM_SALLE").toString());
     }
     return c;
 }
 
 bool Cours::ajouter() {
-    QSqlQuery q;
-    q.prepare("INSERT INTO COURS (NOM_COURS, DESCRIPTION, DUREE, NIVEAU, CATEGORIE, DATE_DEBUT, DATE_FIN, ID_SALLE) "
-              "VALUES (:nom, :desc, :duree, :niveau, :cat, TO_DATE(:debut, 'YYYY-MM-DD'), TO_DATE(:fin, 'YYYY-MM-DD'), :idSalle)");
-    q.bindValue(":nom", m_nom);
-    q.bindValue(":desc", m_description);
-    q.bindValue(":duree", m_duree);
-    q.bindValue(":niveau", m_niveau);
-    q.bindValue(":cat", m_categorie);
-    q.bindValue(":debut", m_dateDebut.toString("yyyy-MM-dd"));
-    q.bindValue(":fin", m_dateFin.toString("yyyy-MM-dd"));
-    if (m_idSalle > 0)
-        q.bindValue(":idSalle", m_idSalle);
-    else
-        q.bindValue(":idSalle", QVariant(QMetaType::fromType<int>()));
-
-    if (!q.exec()) {
-        qCritical() << "Erreur ajout cours:" << q.lastError().text();
-        return false;
+    QSqlQuery query;
+    if (m_idSalle > 0) {
+        query.prepare("INSERT INTO COURS (NOM_COURS, DESCRIPTION, DUREE, NIVEAU, CATEGORIE, DATE_DEBUT, DATE_FIN, ID_SALLE) "
+                      "VALUES (:nom, :desc, :duree, :niv, :cat, :dd, :df, :idSalle)");
+        query.bindValue(":idSalle", m_idSalle);
+    } else {
+        query.prepare("INSERT INTO COURS (NOM_COURS, DESCRIPTION, DUREE, NIVEAU, CATEGORIE, DATE_DEBUT, DATE_FIN, ID_SALLE) "
+                      "VALUES (:nom, :desc, :duree, :niv, :cat, :dd, :df, NULL)");
     }
-    return true;
+    query.bindValue(":nom", m_nom);
+    query.bindValue(":desc", m_description);
+    query.bindValue(":duree", m_duree);
+    query.bindValue(":niv", m_niveau);
+    query.bindValue(":cat", m_categorie);
+    query.bindValue(":dd", m_dateDebut);
+    query.bindValue(":df", m_dateFin);
+
+    return query.exec();
 }
 
 bool Cours::modifier() {
-    QSqlQuery q;
-    q.prepare("UPDATE COURS SET NOM_COURS = :nom, DESCRIPTION = :desc, DUREE = :duree, "
-              "NIVEAU = :niveau, CATEGORIE = :cat, DATE_DEBUT = TO_DATE(:debut, 'YYYY-MM-DD'), "
-              "DATE_FIN = TO_DATE(:fin, 'YYYY-MM-DD'), ID_SALLE = :idSalle WHERE ID_COURS = :id");
-    q.bindValue(":nom", m_nom);
-    q.bindValue(":desc", m_description);
-    q.bindValue(":duree", m_duree);
-    q.bindValue(":niveau", m_niveau);
-    q.bindValue(":cat", m_categorie);
-    q.bindValue(":debut", m_dateDebut.toString("yyyy-MM-dd"));
-    q.bindValue(":fin", m_dateFin.toString("yyyy-MM-dd"));
-    if (m_idSalle > 0)
-        q.bindValue(":idSalle", m_idSalle);
-    else
-        q.bindValue(":idSalle", QVariant(QMetaType::fromType<int>()));
-    q.bindValue(":id", m_id);
-
-    if (!q.exec()) {
-        qCritical() << "Erreur modification cours:" << q.lastError().text();
-        return false;
+    QSqlQuery query;
+    if (m_idSalle > 0) {
+        query.prepare("UPDATE COURS SET NOM_COURS = :nom, DESCRIPTION = :desc, DUREE = :duree, "
+                      "NIVEAU = :niv, CATEGORIE = :cat, DATE_DEBUT = :dd, DATE_FIN = :df, ID_SALLE = :idSalle "
+                      "WHERE ID_COURS = :id");
+        query.bindValue(":idSalle", m_idSalle);
+    } else {
+        query.prepare("UPDATE COURS SET NOM_COURS = :nom, DESCRIPTION = :desc, DUREE = :duree, "
+                      "NIVEAU = :niv, CATEGORIE = :cat, DATE_DEBUT = :dd, DATE_FIN = :df, ID_SALLE = NULL "
+                      "WHERE ID_COURS = :id");
     }
-    return true;
+    query.bindValue(":nom", m_nom);
+    query.bindValue(":desc", m_description);
+    query.bindValue(":duree", m_duree);
+    query.bindValue(":niv", m_niveau);
+    query.bindValue(":cat", m_categorie);
+    query.bindValue(":dd", m_dateDebut);
+    query.bindValue(":df", m_dateFin);
+    query.bindValue(":id", m_id);
+
+    return query.exec();
 }
 
 bool Cours::supprimer() {
-    QSqlQuery q;
-    q.prepare("DELETE FROM COURS WHERE ID_COURS = :id");
-    q.bindValue(":id", m_id);
-    return q.exec();
+    QSqlQuery query;
+    query.prepare("DELETE FROM COURS WHERE ID_COURS = :id");
+    query.bindValue(":id", m_id);
+    return query.exec();
 }
 
 QList<Cours> Cours::afficher() {
     QList<Cours> list;
-    QSqlQuery q("SELECT ID_COURS, NOM_COURS, DESCRIPTION, DUREE, NIVEAU, CATEGORIE, DATE_DEBUT, DATE_FIN, ID_SALLE FROM COURS ORDER BY ID_COURS ASC");
-    while (q.next()) {
-        list.append(fromQuery(q));
+    QSqlQuery query("SELECT ID_COURS, NOM_COURS, DESCRIPTION, DUREE, NIVEAU, CATEGORIE, DATE_DEBUT, DATE_FIN, ID_SALLE FROM COURS ORDER BY ID_COURS ASC");
+    while (query.next()) {
+        list.append(fromQuery(query));
     }
     return list;
 }
 
 QList<Cours> Cours::afficherAvecSalle() {
     QList<Cours> list;
-    QSqlQuery q("SELECT c.ID_COURS, c.NOM_COURS, c.DESCRIPTION, c.DUREE, c.NIVEAU, c.CATEGORIE, "
-                "c.DATE_DEBUT, c.DATE_FIN, c.ID_SALLE, s.NOM_SALLE "
-                "FROM COURS c LEFT JOIN SALLE s ON c.ID_SALLE = s.ID_SALLE ORDER BY c.ID_COURS ASC");
-    while (q.next()) {
-        list.append(fromQuery(q));
+    QSqlQuery query("SELECT c.ID_COURS, c.NOM_COURS, c.DESCRIPTION, c.DUREE, c.NIVEAU, c.CATEGORIE, c.DATE_DEBUT, c.DATE_FIN, c.ID_SALLE, s.NOM_SALLE "
+                    "FROM COURS c LEFT JOIN SALLE s ON c.ID_SALLE = s.ID_SALLE ORDER BY c.ID_COURS ASC");
+    while (query.next()) {
+        list.append(fromQuery(query));
     }
     return list;
 }
 
-QList<Cours> Cours::rechercher(const QString& nom, const QString& niveau,
-                               const QString& categorie, const QDate& dateDebut,
-                               int dureeMin, int dureeMax) {
+QList<Cours> Cours::rechercher(const QString& nom, const QString& niveau, const QString& categorie, const QDate& dateDebut, int dureeMin, int dureeMax) {
     QList<Cours> list;
-    QString sql = "SELECT c.ID_COURS, c.NOM_COURS, c.DESCRIPTION, c.DUREE, c.NIVEAU, c.CATEGORIE, "
-                  "c.DATE_DEBUT, c.DATE_FIN, c.ID_SALLE, s.NOM_SALLE "
+    QString sql = "SELECT c.ID_COURS, c.NOM_COURS, c.DESCRIPTION, c.DUREE, c.NIVEAU, c.CATEGORIE, c.DATE_DEBUT, c.DATE_FIN, c.ID_SALLE, s.NOM_SALLE "
                   "FROM COURS c LEFT JOIN SALLE s ON c.ID_SALLE = s.ID_SALLE WHERE 1=1";
 
-    if (!nom.trimmed().isEmpty()) {
-        sql += " AND UPPER(c.NOM_COURS) LIKE UPPER(:nom)";
-    }
-    if (!niveau.trimmed().isEmpty() && niveau != "Tous") {
-        sql += " AND c.NIVEAU = :niveau";
-    }
-    if (!categorie.trimmed().isEmpty() && categorie != "Tous") {
-        sql += " AND UPPER(c.CATEGORIE) LIKE UPPER(:cat)";
-    }
-    if (dateDebut.isValid()) {
-        sql += " AND c.DATE_DEBUT >= TO_DATE(:dateDebut, 'YYYY-MM-DD')";
-    }
-    if (dureeMin > 0) {
-        sql += " AND c.DUREE >= :dureeMin";
-    }
-    if (dureeMax > 0) {
-        sql += " AND c.DUREE <= :dureeMax";
-    }
-    sql += " ORDER BY c.NOM_COURS ASC";
+    if (!nom.isEmpty()) sql += " AND LOWER(c.NOM_COURS) LIKE '%" + nom.toLower() + "%'";
+    if (!niveau.isEmpty() && niveau != "Tous") sql += " AND c.NIVEAU = '" + niveau + "'";
+    if (!categorie.isEmpty()) sql += " AND LOWER(c.CATEGORIE) LIKE '%" + categorie.toLower() + "%'";
+    if (dureeMin > 0) sql += QString(" AND c.DUREE >= %1").arg(dureeMin);
+    if (dureeMax > 0) sql += QString(" AND c.DUREE <= %1").arg(dureeMax);
 
-    QSqlQuery q;
-    q.prepare(sql);
-    if (!nom.trimmed().isEmpty()) {
-        q.bindValue(":nom", "%" + nom.trimmed() + "%");
-    }
-    if (!niveau.trimmed().isEmpty() && niveau != "Tous") {
-        q.bindValue(":niveau", niveau);
-    }
-    if (!categorie.trimmed().isEmpty() && categorie != "Tous") {
-        q.bindValue(":cat", "%" + categorie.trimmed() + "%");
-    }
-    if (dateDebut.isValid()) {
-        q.bindValue(":dateDebut", dateDebut.toString("yyyy-MM-dd"));
-    }
-    if (dureeMin > 0) {
-        q.bindValue(":dureeMin", dureeMin);
-    }
-    if (dureeMax > 0) {
-        q.bindValue(":dureeMax", dureeMax);
-    }
+    sql += " ORDER BY c.ID_COURS ASC";
 
-    if (q.exec()) {
-        while (q.next()) {
-            list.append(fromQuery(q));
-        }
+    QSqlQuery query(sql);
+    while (query.next()) {
+        list.append(fromQuery(query));
     }
     return list;
 }
@@ -174,14 +134,13 @@ QList<Cours> Cours::trier(const QString& critere, const QString& ordre) {
     else if (critere == "Catégorie") col = "c.CATEGORIE";
     else if (critere == "Date Début") col = "c.DATE_DEBUT";
 
-    QString dir = (ordre.toUpper() == "DESC" || ordre == "Décroissant") ? "DESC" : "ASC";
-    QString sql = QString("SELECT c.ID_COURS, c.NOM_COURS, c.DESCRIPTION, c.DUREE, c.NIVEAU, c.CATEGORIE, "
-                          "c.DATE_DEBUT, c.DATE_FIN, c.ID_SALLE, s.NOM_SALLE "
-                          "FROM COURS c LEFT JOIN SALLE s ON c.ID_SALLE = s.ID_SALLE ORDER BY %1 %2").arg(col, dir);
+    QString dir = (ordre == "Décroissant") ? "DESC" : "ASC";
+    QString sql = QString("SELECT c.ID_COURS, c.NOM_COURS, c.DESCRIPTION, c.DUREE, c.NIVEAU, c.CATEGORIE, c.DATE_DEBUT, c.DATE_FIN, c.ID_SALLE, s.NOM_SALLE "
+                          "FROM COURS c LEFT JOIN SALLE s ON c.ID_SALLE = s.ID_SALLE ORDER BY %1 %2").arg(col).arg(dir);
 
-    QSqlQuery q(sql);
-    while (q.next()) {
-        list.append(fromQuery(q));
+    QSqlQuery query(sql);
+    while (query.next()) {
+        list.append(fromQuery(query));
     }
     return list;
 }
@@ -222,7 +181,6 @@ QMap<int, int> Cours::statsParMois(int annee) {
 
 QList<QStringList> Cours::detecterConflits() {
     QList<QStringList> conflits;
-    // Détection de chevauchement de dates pour une même salle
     QSqlQuery q("SELECT c1.ID_COURS, c1.NOM_COURS, c2.ID_COURS, c2.NOM_COURS, s.NOM_SALLE, "
                 "TO_CHAR(c1.DATE_DEBUT,'DD/MM/YYYY') || ' - ' || TO_CHAR(c1.DATE_FIN,'DD/MM/YYYY'), "
                 "TO_CHAR(c2.DATE_DEBUT,'DD/MM/YYYY') || ' - ' || TO_CHAR(c2.DATE_FIN,'DD/MM/YYYY') "
@@ -256,11 +214,50 @@ int Cours::totalHeures() {
 }
 
 QString Cours::nomSallePourId(int idSalle) {
+    if (idSalle <= 0) return "Non affecté";
     QSqlQuery q;
     q.prepare("SELECT NOM_SALLE FROM SALLE WHERE ID_SALLE = :id");
     q.bindValue(":id", idSalle);
-    if (q.exec() && q.next()) {
-        return q.value(0).toString();
+    if (q.exec() && q.next()) return q.value(0).toString();
+    return "Inconnue";
+}
+
+QString Cours::analyseIAPlanning() {
+    QList<Cours> list = afficherAvecSalle();
+    QList<QStringList> conflits = detecterConflits();
+    int total = list.size();
+    int nonAffectes = 0;
+
+    for (const Cours& c : list) {
+        if (c.getIdSalle() <= 0) nonAffectes++;
     }
-    return "Aucune";
+
+    QString report = "🤖 <b>Rapport d'Intelligence Artificielle - Planification des Cours</b><br><br>";
+    report += QString("📊 <b>Diagnostic Prédictif du Catalogue :</b><br>");
+    report += QString("• Total des Cours au catalogue : <b>%1</b><br>").arg(total);
+    report += QString("• Volume Horaire Cumulé : <font color='#8B5CF6'><b>%1 Heures</b></font><br>").arg(totalHeures());
+    report += QString("• Cours sans salle affectée : <font color='#F59E0B'><b>%1</b></font><br>").arg(nonAffectes);
+    report += QString("• Conflits d'occupation détectés : <font color='%1'><b>%2</b></font><br><br>")
+              .arg(conflits.isEmpty() ? "#059669" : "#DC2626")
+              .arg(conflits.size());
+
+    report += "💡 <b>Recommandations de l'Assistant IA :</b><br>";
+
+    if (!conflits.isEmpty()) {
+        report += "  • 🚨 <b>Alerte Conflit :</b> " + QString::number(conflits.size()) + " chevauchement(s) détecté(s). L'IA préconise de réaffecter l'un des deux cours vers une salle disponible.<br>";
+    } else {
+        report += "  • ✅ <b>Planning Sécurisé :</b> Aucun conflit temporel de salle n'est à déplorer.<br>";
+    }
+
+    if (nonAffectes > 0) {
+        report += QString("  • ⚡ <b>Optimisation d'Affectation :</b> %1 cours n'ont pas encore de salle attribuée. L'IA suggère d'utiliser l'option Modifier pour les affecter à des salles 'Cours' ou 'TP'.<br>").arg(nonAffectes);
+    }
+
+    for (const Cours& c : list) {
+        if (c.getDuree() >= 50) {
+            report += QString("  • ⏱️ <b>%1</b> (%2h) est une formation longue. L'IA recommande un suivi pédagogique hebdomadaire.<br>").arg(c.getNom()).arg(c.getDuree());
+        }
+    }
+
+    return report;
 }

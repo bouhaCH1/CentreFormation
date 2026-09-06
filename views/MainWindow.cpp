@@ -1,9 +1,12 @@
 #include "MainWindow.h"
+#include "LoginWidget.h"
 #include "SalleWidget.h"
 #include "CoursWidget.h"
 #include <QStatusBar>
 #include <QIcon>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent) {
@@ -16,7 +19,22 @@ void MainWindow::setupUI() {
     resize(1300, 850);
     setMinimumSize(1100, 720);
 
-    m_tabWidget = new QTabWidget(this);
+    m_rootStackedWidget = new QStackedWidget(this);
+
+    // ==========================================
+    // PAGE 0 : LOGIN SCREEN
+    // ==========================================
+    m_loginWidget = new LoginWidget(this);
+    m_rootStackedWidget->addWidget(m_loginWidget);
+
+    // ==========================================
+    // PAGE 1 : MAIN DASHBOARD APP
+    // ==========================================
+    m_appContainerWidget = new QWidget(this);
+    QVBoxLayout *appLayout = new QVBoxLayout(m_appContainerWidget);
+    appLayout->setContentsMargins(0, 0, 0, 0);
+
+    m_tabWidget = new QTabWidget(m_appContainerWidget);
     m_tabWidget->setTabPosition(QTabWidget::North);
     m_tabWidget->setMovable(false);
 
@@ -26,12 +44,49 @@ void MainWindow::setupUI() {
     m_tabWidget->addTab(m_salleWidget, "🏫  Gestion des Salles");
     m_tabWidget->addTab(m_coursWidget, "📚  Gestion des Cours");
 
-    setCentralWidget(m_tabWidget);
+    appLayout->addWidget(m_tabWidget);
+    m_rootStackedWidget->addWidget(m_appContainerWidget);
 
-    // Status Bar
-    m_statusLabel = new QLabel("🟢 Oracle XE Connection: ACTIVE (localhost:1521/XE) | ESPRIT 2026", this);
+    setCentralWidget(m_rootStackedWidget);
+    m_rootStackedWidget->setCurrentIndex(0); // Start on Login Screen
+
+    // Status Bar Setup
+    m_statusLabel = new QLabel(this);
     m_statusLabel->setStyleSheet("color: #059669; font-weight: 700; font-size: 13px; padding-left: 10px;");
     statusBar()->addWidget(m_statusLabel);
+
+    m_logoutBtn = new QPushButton("🚪 Déconnexion", this);
+    m_logoutBtn->setCursor(Qt::PointingHandCursor);
+    m_logoutBtn->setStyleSheet("background-color: #EF4444; color: white; font-weight: 700; font-size: 12px; padding: 4px 12px; border-radius: 4px; margin-right: 10px;");
+    m_logoutBtn->setVisible(false);
+    statusBar()->addPermanentWidget(m_logoutBtn);
+
+    // Connections
+    connect(m_loginWidget, &LoginWidget::loginSuccess, this, &MainWindow::onLoginSuccess);
+    connect(m_logoutBtn, &QPushButton::clicked, this, &MainWindow::onLogoutClicked);
+}
+
+void MainWindow::onLoginSuccess(const QString &username, const QString &role) {
+    m_currentUser = username;
+    m_currentRole = role;
+
+    m_statusLabel->setText(QString("🟢 Connecté : %1 (%2) | Oracle XE: ACTIVE (localhost:1521/XE)").arg(username).arg(role));
+    m_logoutBtn->setVisible(true);
+
+    m_rootStackedWidget->setCurrentIndex(1);
+}
+
+void MainWindow::onLogoutClicked() {
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, "Déconnexion", "Voulez-vous vraiment vous déconnecter ?",
+        QMessageBox::Yes | QMessageBox::No
+    );
+
+    if (reply == QMessageBox::Yes) {
+        m_rootStackedWidget->setCurrentIndex(0);
+        m_logoutBtn->setVisible(false);
+        m_statusLabel->setText("🔒 Non connecté");
+    }
 }
 
 void MainWindow::applyGlobalStylesheet() {

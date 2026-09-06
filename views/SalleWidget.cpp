@@ -1,5 +1,6 @@
 #include "SalleWidget.h"
 #include "StatsSalleWidget.h"
+#include "../models/QRCodeGenerator.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -10,6 +11,7 @@
 #include <QPainter>
 #include <QTextDocument>
 #include <QDateTime>
+#include <QDialog>
 
 SalleWidget::SalleWidget(QWidget *parent)
     : QWidget(parent), m_editMode(false), m_editId(0) {
@@ -68,6 +70,12 @@ void SalleWidget::setupUI() {
     m_btnStats = new QPushButton("📊 Statistiques", this);
     m_btnStats->setStyleSheet("background-color: #8B5CF6; color: white;");
 
+    m_btnIA = new QPushButton("🤖 Recommandation IA", this);
+    m_btnIA->setStyleSheet("background-color: #7C3AED; color: white;");
+
+    m_btnQRCode = new QPushButton("📱 QR Code", this);
+    m_btnQRCode->setStyleSheet("background-color: #0284C7; color: white;");
+
     toolbarLayout->addWidget(m_btnAjouter);
     toolbarLayout->addWidget(m_btnModifier);
     toolbarLayout->addWidget(m_btnSupprimer);
@@ -75,6 +83,8 @@ void SalleWidget::setupUI() {
     toolbarLayout->addWidget(btnSearchToggle);
     toolbarLayout->addWidget(m_btnPDF);
     toolbarLayout->addWidget(m_btnStats);
+    toolbarLayout->addWidget(m_btnIA);
+    toolbarLayout->addWidget(m_btnQRCode);
     toolbarLayout->addStretch();
 
     layoutListe->addLayout(toolbarLayout);
@@ -181,6 +191,7 @@ void SalleWidget::setupUI() {
 
     m_nomEdit = new QLineEdit(formCard);
     m_nomEdit->setPlaceholderText("Ex: Salle A101");
+    m_nomEdit->setMaxLength(80);
 
     m_capSpinBox = new QSpinBox(formCard);
     m_capSpinBox->setRange(1, 1000);
@@ -192,6 +203,7 @@ void SalleWidget::setupUI() {
 
     m_equipEdit = new QLineEdit(formCard);
     m_equipEdit->setPlaceholderText("Ex: Projecteur HD, Tableau blanc...");
+    m_equipEdit->setMaxLength(150);
 
     m_dispoCheck = new QCheckBox("Salle disponible pour affectation de cours", formCard);
     m_dispoCheck->setChecked(true);
@@ -257,6 +269,8 @@ void SalleWidget::setupUI() {
     connect(btnAppliquerSort, &QPushButton::clicked, this, &SalleWidget::onApplySort);
     connect(m_btnPDF, &QPushButton::clicked, this, &SalleWidget::onGeneratePDF);
     connect(m_btnStats, &QPushButton::clicked, this, &SalleWidget::onShowStats);
+    connect(m_btnIA, &QPushButton::clicked, this, &SalleWidget::onIAAssistant);
+    connect(m_btnQRCode, &QPushButton::clicked, this, &SalleWidget::onQRCode);
 
     connect(btnSave, &QPushButton::clicked, this, &SalleWidget::onSave);
     connect(btnCancel, &QPushButton::clicked, this, &SalleWidget::onCancel);
@@ -404,7 +418,7 @@ void SalleWidget::onSave() {
         m_stackedWidget->setCurrentIndex(0);
         loadTableData(Salle::afficher());
     } else {
-        m_errorLabel->setText("Erreur lors de l'enregistrement dans la base de données Oracle.");
+        m_errorLabel->setText(QString("Erreur Oracle : %1").arg(Salle::lastError.isEmpty() ? "Vérifiez vos données." : Salle::lastError));
     }
 }
 
@@ -447,6 +461,90 @@ void SalleWidget::onShowStats() {
     m_stackedWidget->setCurrentIndex(2);
 }
 
+void SalleWidget::onIAAssistant() {
+    QString report = Salle::analyseIAOptimisation();
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("🤖 Assistant IA - Optimisation des Salles");
+    msgBox.setText(report);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.exec();
+}
+
+void SalleWidget::onQRCode() {
+    int row = m_tableWidget->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Sélection requise", "Veuillez d'abord cliquer sur une salle dans le tableau pour générer son QR Code.");
+        return;
+    }
+
+    QString idStr = m_tableWidget->item(row, 0)->text();
+    QString nomStr = m_tableWidget->item(row, 1)->text();
+    QString capStr = m_tableWidget->item(row, 2)->text();
+    QString typeStr = m_tableWidget->item(row, 3)->text();
+    QString eqStr = m_tableWidget->item(row, 4)->text();
+    QString dispoStr = m_tableWidget->item(row, 5)->text();
+
+    QString qrPayload = QString(
+        "CENTRE DE FORMATION ESPRIT\n"
+        "--- SALLE DE FORMATION ---\n"
+        "ID: #%1\n"
+        "Nom: %2\n"
+        "Capacité: %3\n"
+        "Type: %4\n"
+        "Équipements: %5\n"
+        "Statut: %6\n"
+        "Oracle XE verified"
+    ).arg(idStr).arg(nomStr).arg(capStr).arg(typeStr).arg(eqStr).arg(dispoStr);
+
+    QPixmap pixmap = QRCodeGenerator::generateQRCodePixmap(qrPayload, 260);
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("📱 Flashcode / QR Code — %1").arg(nomStr));
+    dlg.resize(400, 480);
+
+    QVBoxLayout *layout = new QVBoxLayout(&dlg);
+    layout->setContentsMargins(20, 20, 20, 20);
+    layout->setSpacing(12);
+
+    QLabel *lblTitle = new QLabel(QString("📱 QR Code Officiel - %1").arg(nomStr), &dlg);
+    lblTitle->setStyleSheet("font-size: 16px; font-weight: bold; color: #1E3A8A;");
+    lblTitle->setAlignment(Qt::AlignCenter);
+    layout->addWidget(lblTitle);
+
+    QLabel *lblImg = new QLabel(&dlg);
+    lblImg->setPixmap(pixmap);
+    lblImg->setAlignment(Qt::AlignCenter);
+    layout->addWidget(lblImg);
+
+    QLabel *lblInfo = new QLabel(QString("Scannez ce QR Code pour accéder à la fiche d'information de la salle #%1 (%2).").arg(idStr).arg(nomStr), &dlg);
+    lblInfo->setWordWrap(true);
+    lblInfo->setAlignment(Qt::AlignCenter);
+    lblInfo->setStyleSheet("color: #64748B; font-size: 12px;");
+    layout->addWidget(lblInfo);
+
+    QHBoxLayout *btnLayout = new QHBoxLayout();
+    QPushButton *btnSave = new QPushButton("💾 Enregistrer Image (.png)", &dlg);
+    btnSave->setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; padding: 8px 16px; border-radius: 6px;");
+
+    QPushButton *btnClose = new QPushButton("Fermer", &dlg);
+    btnClose->setStyleSheet("background-color: #64748B; color: white; font-weight: bold; padding: 8px 16px; border-radius: 6px;");
+
+    btnLayout->addWidget(btnSave);
+    btnLayout->addWidget(btnClose);
+    layout->addLayout(btnLayout);
+
+    connect(btnClose, &QPushButton::clicked, &dlg, &QDialog::accept);
+    connect(btnSave, &QPushButton::clicked, [this, pixmap, nomStr]() {
+        QString fileName = QFileDialog::getSaveFileName(this, "Enregistrer QR Code", QString("QRCode_Salle_%1.png").arg(nomStr), "Images PNG (*.png)");
+        if (!fileName.isEmpty()) {
+            pixmap.save(fileName, "PNG");
+            QMessageBox::information(this, "Succès", QString("QR Code enregistré avec succès dans :\n%1").arg(fileName));
+        }
+    });
+
+    dlg.exec();
+}
+
 void SalleWidget::onGeneratePDF() {
     QString fileName = QFileDialog::getSaveFileName(this, "Exporter PDF Salles", "Rapport_Salles.pdf", "Fichiers PDF (*.pdf)");
     if (fileName.isEmpty()) return;
@@ -473,8 +571,6 @@ void SalleWidget::onGeneratePDF() {
             table.grid { width: 100%%; border-collapse: collapse; margin-top: 10px; }
             table.grid th { background-color: #0F172A; color: #FFFFFF; font-size: 12px; font-weight: bold; padding: 10px; text-align: center; border: 1px solid #0F172A; }
             table.grid td { padding: 10px; font-size: 12px; border: 1px solid #CBD5E1; }
-            .badge-dispo { color: #059669; font-weight: bold; }
-            .badge-indispo { color: #DC2626; font-weight: bold; }
             .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #64748B; border-top: 1px solid #CBD5E1; padding-top: 8px; }
         </style>
         </head>
